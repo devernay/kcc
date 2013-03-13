@@ -152,6 +152,15 @@ a.button span {
   height: 23px;
 }
 
+#download-osx span {
+    background: transparent url(../images/zip-icon.png) 12px 50% no-repeat;
+}
+#download-win32 span {
+    background: transparent url(../images/zip-icon.png) 12px 50% no-repeat;
+}
+#download-win64 span {
+    background: transparent url(../images/zip-icon.png) 12px 50% no-repeat;
+}
 #download-zip span {
   background: transparent url(../images/zip-icon.png) 12px 50% no-repeat;
 }
