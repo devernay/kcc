@@ -20,6 +20,7 @@ __copyright__ = '2012-2013, Ciro Mattia Gonano <ciromattia@gmail.com>'
 __docformat__ = 'restructuredtext en'
 
 import os
+import copy
 from PIL import Image, ImageOps, ImageStat
 
 
@@ -113,17 +114,59 @@ class ComicPage:
             raise RuntimeError('Cannot read image file %s' % source)
         self.image = self.image.convert('RGB')
 
-    def saveToDir(self, targetdir, notquantize):
-        filename = os.path.basename(self.origFileName)
-        try:
-            self.image = self.image.convert('L')    # convert to grayscale
-            os.remove(os.path.join(targetdir, filename))
-            if notquantize:
-                self.image.save(os.path.join(targetdir, os.path.splitext(filename)[0] + ".jpg"), "JPEG")
+    def saveToDir(self, targetdir, oformat, nopanelviewhq):
+        if nopanelviewhq:
+            if oformat == "AUTO" or oformat == "PNG":
+                targetFormat = "PNG"
+                dither = "FLOYDSTEINBERG"
+                quantize = True
             else:
-                self.image.save(os.path.join(targetdir, os.path.splitext(filename)[0] + ".png"), "PNG")
-        except IOError as e:
-            raise RuntimeError('Cannot write image in directory %s: %s' % (targetdir, e))
+                targetFormat = "JPEG"
+                quantize = False
+        else:
+            if oformat == "AUTO":
+                targetFormat = "SMALLER"
+            elif oformat == "PNG":
+                targetFormat = "PNG"
+                dither = "NONE"
+                quantize = True
+            else:
+                targetFormat = "JPEG"
+                quantize = False
+        if targetFormat == "SMALLER":
+            filename = os.path.basename(self.origFileName)
+            os.remove(os.path.join(targetdir, filename))
+            jpgOutput = copy.copy(self)
+            pngOutput = copy.copy(self)
+            pngOutput.quantizeImage("NONE")
+            try:
+                jpgOutput.image = jpgOutput.image.convert('L')    # convert to grayscale
+                jpgOutput.image.save(os.path.join(targetdir, os.path.splitext(filename)[0] + ".jpg"), "JPEG")
+            except IOError as e:
+                raise RuntimeError('Cannot write image in directory %s: %s' % (targetdir, e))
+            try:
+                pngOutput.image = pngOutput.image.convert('L')    # convert to grayscale
+                pngOutput.image.save(os.path.join(targetdir, os.path.splitext(filename)[0] + ".png"), "PNG")
+            except IOError as e:
+                raise RuntimeError('Cannot write image in directory %s: %s' % (targetdir, e))
+            if os.path.getsize(os.path.join(targetdir, os.path.splitext(filename)[0] + ".jpg")) > os.path.getsize(
+                    os.path.join(targetdir, os.path.splitext(filename)[0] + ".png")):
+                os.remove(os.path.join(targetdir, os.path.splitext(filename)[0] + ".jpg"))
+            else:
+                os.remove(os.path.join(targetdir, os.path.splitext(filename)[0] + ".png"))
+        else:
+            if quantize:
+                self.quantizeImage(dither)
+            filename = os.path.basename(self.origFileName)
+            try:
+                self.image = self.image.convert('L')    # convert to grayscale
+                os.remove(os.path.join(targetdir, filename))
+                if targetFormat == "JPEG":
+                    self.image.save(os.path.join(targetdir, os.path.splitext(filename)[0] + ".jpg"), "JPEG")
+                else:
+                    self.image.save(os.path.join(targetdir, os.path.splitext(filename)[0] + ".png"), "PNG")
+            except IOError as e:
+                raise RuntimeError('Cannot write image in directory %s: %s' % (targetdir, e))
 
     def optimizeImage(self, gamma):
         if gamma < 0.1:
@@ -133,15 +176,11 @@ class ComicPage:
         else:
             self.image = ImageOps.autocontrast(Image.eval(self.image, lambda a: 255 * (a / 255.) ** gamma))
 
-    def quantizeImage(self):
-        self.image = self.image.convert('L')    # convert to grayscale
-        self.image = self.image.convert("RGB")    # convert back to RGB
+    def quantizeImage(self, dither):
         colors = len(self.palette) / 3
         if colors < 256:
             self.palette += self.palette[:3] * (256 - colors)
-        palImg = Image.new('P', (1, 1))
-        palImg.putpalette(self.palette)
-        self.image = self.image.quantize(palette=palImg)
+        self.image = self.image.convert("P", palette=Image.ADAPTIVE, colors=colors, dither=dither)
 
     def resizeImage(self, upscale=False, stretch=False, black_borders=False, isSplit=False, toRight=False,
                     landscapeMode=False, noPanelViewHQ=False):

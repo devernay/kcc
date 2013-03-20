@@ -297,8 +297,8 @@ def applyImgOptimization(img, isSplit=False, toRight=False):
     img.resizeImage(options.upscale, options.stretch, options.black_borders, isSplit, toRight, options.landscapemode,
                     options.nopanelviewhq)
     img.optimizeImage(options.gamma)
-    if not options.notquantize:
-        img.quantizeImage()
+    img.image = img.image.convert("L")    # convert to grayscale
+    img.image = img.image.convert("RGB")    # convert back to RGB
 
 
 def dirImgProcess(path):
@@ -337,17 +337,17 @@ def dirImgProcess(path):
                         facing = "left"
                     img0 = image.ComicPage(split[0], options.profile)
                     applyImgOptimization(img0, True, toRight1)
-                    img0.saveToDir(dirpath, options.notquantize)
+                    img0.saveToDir(dirpath, options.oformat, options.nopanelviewhq)
                     img1 = image.ComicPage(split[1], options.profile)
                     applyImgOptimization(img1, True, toRight2)
-                    img1.saveToDir(dirpath, options.notquantize)
+                    img1.saveToDir(dirpath, options.oformat, options.nopanelviewhq)
                 else:
                     if facing == "right":
                         facing = "left"
                     else:
                         facing = "right"
                     applyImgOptimization(img)
-                    img.saveToDir(dirpath, options.notquantize)
+                    img.saveToDir(dirpath, options.oformat, options.nopanelviewhq)
 
 
 def genEpubStruct(path):
@@ -556,12 +556,12 @@ def main(argv=None):
                       help="Comic title [Default=filename]")
     parser.add_option("-m", "--manga-style", action="store_true", dest="righttoleft", default=False,
                       help="Manga style (Right-to-left reading and splitting) [Default=False]")
+    parser.add_option("--outputformat", action="store", dest="oformat", default="AUTO",
+                      help="Output image format (Choose one among AUTO, PNG, JPG) [Default=AUTO]")
     parser.add_option("--nopanelviewhq", action="store_true", dest="nopanelviewhq", default=False,
                       help="Disable high quality Panel View [Default=False]")
     parser.add_option("--noprocessing", action="store_false", dest="imgproc", default=True,
                       help="Do not apply image preprocessing (Page splitting and optimizations) [Default=True]")
-    parser.add_option("--nodithering", action="store_true", dest="notquantize", default=False,
-                      help="Disable image quantization [Default=False]")
     parser.add_option("--gamma", type="float", dest="gamma", default="0.0",
                       help="Apply gamma correction to linearize the image [Default=Auto]")
     parser.add_option("--upscale", action="store_true", dest="upscale", default=False,
@@ -616,6 +616,8 @@ def main(argv=None):
 
 def checkOptions():
     global options
+    options.oformat = options.oformat.upper()
+    options.profile = options.profile.upper()
     if options.profile == 'K4T' or options.profile == 'KHD':
         options.landscapemode = True
     else:
@@ -628,6 +630,8 @@ def checkOptions():
         options.panelview = False
     if options.profile == 'K1' or options.profile == 'K2' or options.profile == 'KDX' or options.profile == 'KDXG':
         options.nopanelviewhq = True
+    if not options.oformat == "AUTO" and not options.oformat == "PNG" and not options.oformat == "JPG":
+        raise RuntimeError('Wrong output image format')
 
 
 def getEpubPath():
